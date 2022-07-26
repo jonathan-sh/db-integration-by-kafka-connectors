@@ -1,0 +1,17 @@
+[{
+    "$match": {
+        "operationType": {
+            "$in": ["insert", "update", "replace"]
+        }
+    }
+}, {
+    "$project": {
+        "_id": 1,
+        "fullDocument.quote_id": "$fullDocument.quoteId",
+        "fullDocument.plan_price": "$fullDocument.planPrice",
+        "fullDocument.created_at": "$fullDocument.createdAt",
+        "fullDocument.updated_at": "$fullDocument.updatedAt",
+        "ns": 1,
+        "documentKey": 1
+    }
+}]

@@ -1,0 +1,156 @@
+version: "3.5"
+networks:
+  jhs:
+    name: jhs
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.5.0.0/16
+
+services:
+
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    container_name: zookeeper
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - jhs
+    ports:
+      - 2181:2181
+
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://10.5.0.1:9092
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    networks:
+      - jhs
+    ports:
+      - 9092:9092
+      
+  schema-registry:
+    image: confluentinc/cp-schema-registry:5.4.0
+    hostname: schema-registry
+    container_name: schema-registry
+    depends_on:
+      - zookeeper
+      - kafka
+    networks:
+      - jhs
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: "zookeeper:2181"
+      
+  kafdrop:
+    image: obsidiandynamics/kafdrop:latest
+    hostname: kafdrop
+    container_name: kafdrop
+    depends_on:
+      - zookeeper
+      - kafka
+    networks:
+      - jhs
+    ports:
+      - "19000:9000"
+    environment:
+      KAFKA_BROKERCONNECT: kafka:9092
+
+  mongo:
+    container_name: mongo
+    image: mongo:latest
+    restart: unless-stopped
+    entrypoint: [ "/usr/bin/mongod", "--bind_ip_all", "--replSet", "rs0" ]
+    environment:
+      DB_NAME: mongo
+      MONGO_REPLICA_SET_NAME: rs0
+    networks:
+      - jhs
+    ports:
+      - 27017:27017
+  
+  mongo-repl-set-up:
+    image: mongo:latest
+    depends_on:
+      - mongo
+    restart: "no"
+    entrypoint: [ "bash", "-c", "sleep 10 && mongo --host mongo:27017 --eval 'rs.initiate({ _id: \"rs0\", version: 1, members: [ { _id: 0, host : \"localhost:27017\" } ] } )'"]
+    networks:
+      - jhs
+
+  mongo-source-connector:
+    container_name: mongo-source-connector
+    build:
+      context: ./mongo-source-connector
+      dockerfile: Dockerfile
+    depends_on:
+      - zookeeper
+      - kafka
+      - schema-registry
+      - mongo
+      - mongo-repl-set-up
+    restart: unless-stopped
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: '10.5.0.1:9092'
+      CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect-mongodb-source
+      CONNECT_REST_PORT: '8082'
+      CONNECT_GROUP_ID: connect-mongodb-source
+      CONNECT_CONFIG_STORAGE_TOPIC: connect-mongodb-source-config
+      CONNECT_OFFSET_STORAGE_TOPIC: connect-mongodb-source-offsets
+      CONNECT_STATUS_STORAGE_TOPIC: connect-mongodb-source-status
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_PLUGIN_PATH: '/usr/share/java/,/usr/share/confluent-hub-components/'
+    networks:
+      - jhs
+  
+  postgres:
+    container_name: postgres
+    image: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    networks:
+      - jhs
+    ports:
+      - 5432:5432
+
+  postgres-sink-connector:
+    container_name: postgres-sink-connector
+    build:
+      context: ./postgres-sink-connector
+      dockerfile: Dockerfile
+    depends_on:
+      - zookeeper
+      - kafka
+      - schema-registry
+      - postgres
+    restart: unless-stopped
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: '10.5.0.1:9092'
+      CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect-jdbc-sink
+      CONNECT_REST_PORT: '8082'
+      CONNECT_GROUP_ID: connect-jdbc-sink
+      CONNECT_CONFIG_STORAGE_TOPIC: connect-jdbc-sink-config
+      CONNECT_OFFSET_STORAGE_TOPIC: connect-jdbc-sink-offsets
+      CONNECT_STATUS_STORAGE_TOPIC: connect-jdbc-sink-status
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_PLUGIN_PATH: '/usr/share/java/,/usr/share/confluent-hub-components/'
+    networks:
+      - jhs

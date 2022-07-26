@@ -1,0 +1,26 @@
+{
+    "type": "record",
+    "name": "QuoteValueSchemaV1",
+    "fields": [{
+            "name": "quote_id",
+            "type": ["null", "string"],
+            "default": null
+        },
+        {
+            "name": "plan_price",
+            "type": ["null", "float"],
+            "default": null
+        },
+        {
+            "name": "created_at",
+            "type": ["null", "long"],
+            "default": null
+        },
+        {
+            "name": "updated_at",
+            "type": ["null", "long"],
+            "default": null
+        }
+    ],
+    "connect.name": "default"
+}
