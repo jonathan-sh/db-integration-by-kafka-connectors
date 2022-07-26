@@ -70,7 +70,7 @@ Have a nice experience!
 :)
 
 
-[scenario]: https://github.com/jonathan-sh/db-integration-by-kafka-connectors/doc/db-integration.jpg
+[scenario]: https://raw.githubusercontent.com/jonathan-sh/db-integration-by-kafka-connectors/main/doc/db-integration.jpg
 [kafka-connectors]: https://www.youtube.com/watch?v=WnUsiueKfKI&ab_channel=Confluent
 [docker-composer]: https://github.com/jonathan-sh/db-integration-by-kafka-connectors/doc/docker-composer.png
 [insert]: https://github.com/jonathan-sh/db-integration-by-kafka-connectors/doc/insert.png
